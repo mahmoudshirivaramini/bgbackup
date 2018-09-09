@@ -3,12 +3,10 @@
 # bgbackup - A backup shell script for MariaDB, MySQL and Percona
 #
 # Authors: Ben Stillman <ben@mariadb.com>, Guillaume Lefranc <guillaume@signal18.io>
-# Major editor: Mahmoud Shiri Varamini <shirivaramini@gmail.com>
 # License: GNU General Public License, version 3.
 # Redistribution/Reuse of this code is permitted under the GNU v3 license.
 # As an additional term ALL code must carry the original Author(s) credit in comment form.
 # See LICENSE in this directory for the integral text.
-# Project URL: https://github.com/mahmoudshirivaramini/bgbackup
 
 
 
