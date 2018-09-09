@@ -3,14 +3,87 @@
 # bgbackup - A backup shell script for MariaDB, MySQL and Percona
 #
 # Authors: Ben Stillman <ben@mariadb.com>, Guillaume Lefranc <guillaume@signal18.io>
+# Major editor: Mahmoud Shiri Varamini <shirivaramini@gmail.com>
 # License: GNU General Public License, version 3.
 # Redistribution/Reuse of this code is permitted under the GNU v3 license.
 # As an additional term ALL code must carry the original Author(s) credit in comment form.
 # See LICENSE in this directory for the integral text.
+# Project URL: https://github.com/mahmoudshirivaramini/bgbackup
 
 
 
+
+
+##############################################
+# Exit status
+##############################################
+# 0     successfully done
+# 1     invalid user runs script
+# 2     percona-xtrabackup package dose not exist
+# 3     mailx package dose not exist
+# 4     qpress package dose not exist
+# 5     MySQL password incorrect
+# 6     Something went wrong, some migrated records not updated correctly
+# 7     Backup history database record NOT inserted successfully
+# 8     Fatal compression method is unsupported
+# 9     bgbackup.cnf configuration file not found.The configuration file must exist somewhere in /etc or in the same directory where the script is located
+# 10    Log dir $logpath not found
+# 11    Log dir not writeable
+# 12    The configured directory for backups does not exist. Please create this first
+# 13    directory is not writable.Verify the user running this script has write access to the configured backup directory
+# 14    xtrabackup/innobackupex does not appear to be installed. Please install and try again
+# 15    mysql client is unable to connect with the information you have provided. Please check your configuration and try again
+# 16    The schema containing the history does not exist. Please check your configuration and try again
+# 130   SIGINT detected. Exiting
+
+
+
+
+
+###############################################
 # Functions
+###############################################
+
+# check if executor user if validated or not
+function check_user_validation {
+permitted_user_id=$(/usr/bin/grep ^$permitted_user /etc/passwd | /usr/bin/cut -d':' -f3)
+if [ "$USER" != "$permitted_user" -o "$UID" != "$permitted_user_id" ];then
+        log_info "$USER is invalid user.please contact system administrator"
+        exit 1
+fi
+}
+
+
+# check percona-xtrabackup package exist or not
+function check_required_package {
+/usr/bin/rpm -qa | grep percona-xtrabackup* &> /dev/null
+if [ $? -ne 0  ];then
+        log_info "percona-xtrabackup package dose not exist.please install the package then try again."
+        exit 2
+fi
+/usr/bin/rpm -qa | grep mailx  &> /dev/null
+if [ $? -ne 0  ];then
+        log_info "mailx package dose not exist.please install the package then try again."
+        exit 3
+fi
+
+/usr/bin/rpm -qa | grep qpress &> /dev/null
+if [ $? -ne 0  ];then
+        log_info "qpress package dose not exist.please install the package then try again."
+        exit 4
+fi
+}
+
+
+# check backup user password
+function check_bkp_user_password {
+echo exit | mysql --user=${backupuser} --password=${backuppass} -B 2>/dev/null
+if [ $? -ne 0 ]; then
+        log_info  "MySQL ${backupuser} password incorrect"
+        exit 5
+fi
+}
+
 
 # Handle control-c
 function sigint {
@@ -23,10 +96,12 @@ function sigint {
   exit 130
 }
 
+
 # Mail function
 function mail_log {
     mail -s "$mailsubpre $HOSTNAME Backup $log_status $mdate" "$maillist" < "$logfile"
 }
+
 
 # Function to check log for okay
 function log_check {
@@ -36,6 +111,7 @@ function log_check {
         log_status=FAILED
     fi
 }
+
 
 # Logging function
 function log_info() {
@@ -48,6 +124,7 @@ function log_info() {
         logger -p local0.notice -t bgbackup "$*"
     fi
 }
+
 
 # Function to create innobackupex command
 function innocreate {
@@ -106,15 +183,18 @@ function innocreate {
     if [ "$nolock" = yes ] && [ "$slave" = yes ] ; then innocommand=$innocommand" --safe-slave-backup" ; fi
 }
 
+
 # Function to decrypt xtrabackup_checkpoints
 function checkpointsdecrypt {
     xbcrypt -d --encrypt-key-file="$cryptkey" --encrypt-algo=AES256 < "$dirname"/xtrabackup_checkpoints.xbcrypt > "$dirname"/xtrabackup_checkpoints
 }
 
+
 # Function to disable/enable MONyog alerts
 function monyog {
     curl "${monyoghost}:${monyogport}/?_object=MONyogAPI&_action=Alerts&_value=${1}&_user=${monyoguser}&_password=${monyogpass}&_server=${monyogserver}"
 }
+
 
 # Function to do the backup
 function backer_upper {
@@ -162,6 +242,7 @@ function backer_upper {
     log_info "CAUTION: ALWAYS VERIFY YOUR BACKUPS."
 }
 
+
 # Function to prepare backup
 function backup_prepare {
     prepcommand="$innobackupex $dirname --apply-log"
@@ -175,6 +256,7 @@ function backup_prepare {
     log_info "Archiving complete."
 }
 
+
 # Function to build mysql command
 function mysqlcreate {
     mysql=$(command -v mysql)
@@ -185,6 +267,7 @@ function mysqlcreate {
     [ -n "$backuphistport" ] && mysqlcommand=$mysqlcommand" -P $backuphistport"
     mysqlcommand=$mysqlcommand" -Bse "
 }
+
 
 # Function to build mysqldump command
 function mysqldumpcreate {
@@ -197,6 +280,7 @@ function mysqldumpcreate {
     mysqldumpcommand=$mysqldumpcommand" $backuphistschema"
     mysqldumpcommand=$mysqldumpcommand" backup_history"
 }
+
 
 # Function to create backup_history table if not exists
 function create_history_table {
@@ -230,6 +314,7 @@ EOF
     log_info "backup history table created"
 }
 
+
 # Function to check if Percona backup history records exist and need migrated
 function check_migrate {
     perconacnt=$($mysqlcommand "SELECT COUNT(a.uuid) FROM PERCONA_SCHEMA.xtrabackup_history a LEFT JOIN $backuphistschema.backup_history b ON a.uuid = b.uuid WHERE b.uuid IS NULL;")
@@ -239,6 +324,7 @@ function check_migrate {
         migrate
     fi
 }
+
 
 # Function to migrate percona backup history records
 function migrate {
@@ -294,12 +380,13 @@ EOF
     if [ "$lefttomigratecnt" -gt 0 ];
     then
         log_info "Something went wrong, some migrated records not updated correctly."
-        exit 1
+        exit 6
     else
         log_info "$perconacnt Percona backup history records migrated."
     fi
 
 }
+
 
 # Function to write backup history to database
 function backup_history {
@@ -319,7 +406,8 @@ VALUES (UUID(), "$mhost", "$starttime", "$endtime", "$bulocation", "$logfile", "
 EOF
 )
     $mysqlcommand "$historyinsert"
-    #verify insert
+
+# verify insert
     verifyinsert=$($mysqlcommand "select count(*) from $backuphistschema.backup_history where hostname='$mhost' and end_time='$endtime'")
     if [ "$verifyinsert" -eq 1 ]; then
         log_info "Backup history database record inserted successfully."
@@ -328,9 +416,10 @@ EOF
         log_info "Backup history database record NOT inserted successfully!"
         log_status=FAILED
         mail_log
-        exit 1
+        exit 7
     fi
 }
+
 
 # Function to cleanup backups.
 function backup_cleanup {
@@ -354,6 +443,7 @@ function backup_cleanup {
     fi
 }
 
+
 # Function to dump $backuphistschema schema
 function mdbutil_backup {
     if [ $log_status = "SUCCEEDED" ]; then
@@ -364,18 +454,20 @@ function mdbutil_backup {
     fi
 }
 
+
 # Function to cleanup mdbutil backups
 function mdbutil_backup_cleanup {
     if [ $log_status = "SUCCEEDED" ]; then
-        delbkuptbllist=$(ls -tp "$backupdir" | grep "$backuphistschema".backup_history | tail -n +$((keepbkuptblnum+=1)))
+        delbkuptbllist=$(ls -tp "$backupdir" | grep "$backuphistschema".backup_history | tail -n +$((keepbkuptblnum+=1)) )
         for bkuptbltodelete in $delbkuptbllist; do
             rm -f "$backupdir"/"$bkuptbltodelete"
             log_info "Deleted backup history backup $bkuptbltodelete"
-        done
-    else
-        log_info "Backup failed. No backup history backups deleted at this time."
-    fi
+       done
+       else
+       log_info "Backup failed. No backup history backups deleted at this time."
+   fi
 }
+
 
 # Function to check config parameters
 function config_check {
@@ -388,9 +480,10 @@ function config_check {
         log_info "Fatal: $computil compression method is unsupported."
         log_status=FAILED
         mail_log
-        exit 1
+        exit 8
     fi
 }
+
 
 # Debug variables function
 function debugme {
@@ -435,8 +528,13 @@ function debugme {
     echo "run_after_fail: " "$run_after_fail"
 }
 
+
+
+
 ############################################
 # Begin script
+############################################
+
 
 # we trap control-c
 trap sigint INT
@@ -452,23 +550,25 @@ else
     echo "Error: bgbackup.cnf configuration file not found"
     echo "The configuration file must exist somewhere in /etc or"
     echo "in the same directory where the script is located"
-    exit 1
+    exit 9
 fi
 
 if [ ! -d "$logpath" ]; then
     echo "Error: Log dir $logpath not found"
-    exit 1
+    exit 10
 fi
 
 if [ ! -w "$logpath" ]; then
     echo "Error: Log dir $logpath not writeable"
-    exit 1
+    exit 11
 fi
+
 
 # Set some specific variables
 starttime=$(date +"%Y-%m-%d %H:%M:%S")
 mdate=$(date +%m/%d/%y)    # Date for mail subject. Not in function so set at script start time, not when backup is finished.
 logfile=$logpath/bgbackup_$(date +%Y-%m-%d-%T).log    # logfile
+
 
 
 # verify the backup directory exists
@@ -478,8 +578,10 @@ then
     log_info "The configured directory for backups does not exist. Please create this first."
     log_status=FAILED
     mail_log
-    exit 1
+    exit 12
 fi
+
+
 
 # verify user running script has permissions needed to write to backup directory
 if [ ! -w "$backupdir" ]; then
@@ -487,8 +589,9 @@ if [ ! -w "$backupdir" ]; then
     log_info "Verify the user running this script has write access to the configured backup directory."
     log_status=FAILED
     mail_log
-    exit 1
+    exit 13
 fi
+
 
 
 # Check for xtrabackup
@@ -498,10 +601,11 @@ else
     log_info "xtrabackup/innobackupex does not appear to be installed. Please install and try again."
     log_status=FAILED
     mail_log
-    exit 1
+    exit 14
 fi
 
 mysqlcreate
+
 
 # Check that mysql client can connect
 $mysqlcommand "SELECT 1 FROM DUAL" 1>/dev/null
@@ -509,8 +613,9 @@ if [ "$?" -eq 1 ]; then
   log_info "Error: mysql client is unable to connect with the information you have provided. Please check your configuration and try again."
   log_status=FAILED
   mail_log
-  exit 1
+  exit 15
 fi
+
 
 # Check that the database exists before continuing further
 $mysqlcommand "USE $backuphistschema"
@@ -518,7 +623,7 @@ if [ "$?" -eq 1 ]; then
   log_info "Error: The schema containing the history '$backuphistschema' does not exist. Please check your configuration and try again."
   log_status=FAILED
   mail_log
-  exit 1
+  exit 16
 fi
 
 check_table=$($mysqlcommand "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$backuphistschema' AND table_name='backup_history' ")
@@ -528,9 +633,15 @@ fi
 
 if [ "$checkmigrate" = yes ] ; then
     check_migrate # Check if Percona backup history records exist and migrate if needed
+
 fi
 
 config_check # Check vital configuration parameters
+
+
+check_user_validation
+check_required_package
+check_bkp_user_password
 
 backer_upper # Execute the backup.
 
@@ -559,4 +670,4 @@ if [ "$debug" = yes ] ; then
     debugme
 fi
 
-exit
+exit 0
