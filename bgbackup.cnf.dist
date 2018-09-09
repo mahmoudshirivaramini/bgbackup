@@ -36,6 +36,9 @@ backuphistuser=mariadbbackup
 # MariaDB password for backup history
 backuphistpass=testpass
 
+# The user can run bgbackup.sh script
+permitted_user=root
+
 # MariaDB schema for backup history
 backuphistschema=mdbutil
 
