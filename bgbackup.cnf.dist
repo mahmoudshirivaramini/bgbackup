@@ -1,4 +1,6 @@
 ############################################
+# bgbackup configuration file
+############################################
 
 # bgbackup configuration file
 
@@ -10,19 +12,19 @@
 checkmigrate=no
 
 # MariaDB host (optional)
-#host=127.0.0.1
+host=127.0.0.1
 
 # MariaDB host port (optional)
-#hostport=3306
+hostport=3306
 
 # MySQL socket
-# socket=/var/lib/mysql/mysql.sock
+socket=/var/lib/mysql/mysql.sock
 
 # MariaDB backup username
-backupuser=testuser
+backupuser=backupuser
 
 # MariaDB backup user password
-backuppass=testpass
+backuppass=backuppass
 
 # MariaDB host for backup history
 backuphisthost=localhost
@@ -30,11 +32,14 @@ backuphisthost=localhost
 # MariaDB port for backup history
 #backuphistport=3306
 
+# The user can run bgbackup.sh script
+permitted_user=root
+
 # MariaDB user for backup history
-backuphistuser=mariadbbackup
+backuphistuser=backupuser
 
 # MariaDB password for backup history
-backuphistpass=testpass
+backuphistpass=backuppass
 
 # MariaDB schema for backup history
 backuphistschema=mdbutil
@@ -58,28 +63,31 @@ monyoghost=
 monyogport=
 
 # Day of week to do full backup. Set to "Everyday" to do full backup everyday (subsequent daily backups will be incremental)
+#fullbackday=Everyday
 fullbackday=Everyday
 
 # Differential does incremental backup based on the last full backup instead of last full or incremental
-differential=no
+differential=yes
 
 # Number of full backups to keep
-keepnum=3
+keepnum=7
 
 # Number of backup table backups to keep.
-keepbkuptblnum=1
+keepbkuptblnum=21
 
 # Full path to backup directory root
-backupdir=/backups
+backupdir=/backup/xdb
 
 # Path to keep logs
 logpath=/var/log
 
 # Log verbosity
-verbose=no
+#verbose=no
+verbose=yes
 
 # Log to syslog
-syslog=no
+#syslog=no
+syslog=yes
 
 # Backup type (directory or archive)
 bktype=directory
@@ -94,13 +102,13 @@ threads=4
 parallel=yes
 
 # Encrypt backup?
-encrypt=yes
+encrypt=no
 
 # Full path to encryption key
 cryptkey=/etc/my.cnf.d/backupscript.key
 
 # Compress backup?
-compress=yes
+compress=no
 
 # Compression utility used for archives, for now gzip or pigz (parallel gzip) are supported
 # For standalone directories, qpress is always used
@@ -114,19 +122,20 @@ nolock=no
 
 # Include Galera info and enable wsrep_desync to avoid flow control during backup.
 # When the backup is finished, wait for wsrep_local_recv_queue to drop to 0 before
-# disabling wsrep_desync. 
-galera=no
+# disabling wsrep_desync.
+galera=
 
 # Include slave info?
-# WARNING: If slave info is included and nolock is enabled, bgbackup will enable safe-slave-backup. 
+# WARNING: If slave info is included and nolock is enabled, bgbackup will enable safe-slave-backup.
 # (safe slave backups will temporarily pause replication. Please inspect the documentation if your application cannot handle stale reads.)
-slave=no
+slave=
 
 # Comma separated list of email address to be notified.
-maillist=admin@example.com
+maillist=shirivaramini@gmail.com,mahmoud.shirivaramini@gmail.com
 
 # Email subject prefix
-mailsubpre="[BGBackup]"
+#mailsubpre="[BGBackup]"
+mailsubpre="[$HOSTNAME DB backup report]"
 
 # Email (all or failure)
 mailon=all
