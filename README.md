@@ -32,6 +32,9 @@ Incremental backups are performed by default. To enable differential backups, se
 
 Details about all backups are emailed to all email addresses listed in MAILLIST if `mailonsuccess` is enabled. Otherwise, only details about failed backups are emailed. 
 
+### User and Database Connection Validation
+Before script run, The script check that The runner user should be same as permitted_user.Also backupper connection to database (backupper connect to database via port,backupuser and backuppass) check before backup operation.
+
 ### Logging
 
 In addition to logging to a log file, output can also be logged to syslog. 
